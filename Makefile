@@ -7,7 +7,8 @@ CONFIG ?= configs/default.yaml
 .PHONY: setup venv install lock data lint format test clean clean-data
 
 ## Everything a clean clone needs before any other target will work.
-setup: install data
+setup: install
+	$(MAKE) data
 
 venv:
 	@test -d $(VENV) || $(PYTHON) -m venv $(VENV)
@@ -38,7 +39,7 @@ format:
 	$(VENV)/bin/black src scripts tests
 
 test:
-	$(PY) -m pytest -q
+	$(PY) -m pytest -q -m "not integration"
 
 ## Removes reproducible outputs and caches only. The dataset is a 5GB download; deleting it
 ## needs its own target so a stray `make clean` cannot cost anyone an afternoon.
@@ -48,3 +49,37 @@ clean:
 
 clean-data:
 	rm -rf data
+
+.PHONY: train evaluate serve reproduce integration
+train:
+	$(PY) scripts/train.py --config "$(CONFIG)"
+
+evaluate:
+	$(PY) scripts/evaluate.py --config "$(CONFIG)"
+
+serve:
+	$(PY) scripts/serve.py --config "$(CONFIG)"
+
+integration:
+	$(PY) -m pytest -q -m integration
+
+## Recursive calls keep the pipeline sequential even under `make -j`.
+reproduce:
+	$(MAKE) setup
+	$(MAKE) train
+	$(MAKE) evaluate
+	$(MAKE) benchmark
+	$(MAKE) report
+	$(MAKE) lint test
+	$(MAKE) integration
+
+.PHONY: benchmark guide
+benchmark:
+	$(PY) scripts/benchmark_api.py --config "$(CONFIG)"
+
+guide:
+	$(PY) -m http.server 8765 --bind 127.0.0.1 --directory .
+
+.PHONY: report
+report:
+	$(PY) scripts/snapshot_report.py --config "$(CONFIG)"

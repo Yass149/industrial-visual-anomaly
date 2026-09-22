@@ -1,5 +1,5 @@
 # Datasets are fetched by scripts/download_data.py, never committed (MVTec AD is ~5GB
-# and its licence forbids redistribution).
+# and belongs outside source control).
 data/
 
 # Trained memory banks and generated figures/metrics are reproducible outputs, not source.
@@ -22,3 +22,7 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
+
+# Local assistant session state is not project source.
+.claude/
+.remember/

@@ -44,6 +44,8 @@ model:
 eval:
   results_dir: results
   n_qualitative: 8
+  # Labelled test images used ONLY to select the operating threshold.
+  calibration_fraction: 0.3
 
 threshold:
   # cost of missing a defect, relative to the cost of a false alarm
@@ -60,3 +62,6 @@ serve:
 monitoring:
   drift_alpha: 0.01
   reference_sample: 256
+  # Independent incoming images per test; patches are not independent observations.
+  window_size: 64
+  projections: 8

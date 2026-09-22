@@ -39,9 +39,8 @@ class Sample:
 def build_transform(image_size: int, crop_size: int) -> transforms.Compose:
     """The image preprocessing pipeline. Deterministic: no augmentation, anywhere.
 
-    PatchCore models the distribution of normal patch features, so augmenting the training
-    set would widen that distribution with variation the production camera never produces
-    and make the memory bank tolerant of things it should flag.
+    No augmentation keeps this baseline reproducible. Realistic augmentation could improve
+    coverage; whether it helps must be measured against actual camera variation.
     """
     return transforms.Compose(
         [

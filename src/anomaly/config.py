@@ -40,7 +40,7 @@ VALID_LAYERS: frozenset[str] = frozenset({"layer1", "layer2", "layer3", "layer4"
 
 
 class _Base(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
 class DataConfig(_Base):
@@ -87,7 +87,7 @@ class DataConfig(_Base):
 
 
 class ModelConfig(_Base):
-    backbone: str
+    backbone: Literal["wide_resnet50_2", "resnet50", "resnet18"]
     layers: list[str] = Field(min_length=1)
     image_size: int = Field(gt=0)
     crop_size: int = Field(gt=0)
@@ -102,6 +102,8 @@ class ModelConfig(_Base):
         unknown = sorted(set(v) - VALID_LAYERS)
         if unknown:
             raise ValueError(f"unknown backbone layers: {unknown}")
+        if len(set(v)) != len(v):
+            raise ValueError("duplicate backbone layers")
         return v
 
     @field_validator("patch_neighbourhood")
@@ -123,6 +125,7 @@ class ModelConfig(_Base):
 class EvalConfig(_Base):
     results_dir: Path
     n_qualitative: int = Field(gt=0)
+    calibration_fraction: float = Field(default=0.3, gt=0, lt=1)
 
 
 class ThresholdConfig(_Base):
@@ -143,11 +146,14 @@ class ServeConfig(_Base):
     port: int = Field(gt=0, lt=65536)
     category: str
     artifacts_dir: Path
+    max_upload_mb: int = Field(default=10, gt=0)
 
 
 class MonitoringConfig(_Base):
     drift_alpha: float = Field(gt=0.0, lt=1.0)
     reference_sample: int = Field(gt=0)
+    window_size: int = Field(default=64, ge=2)
+    projections: int = Field(default=8, ge=1)
 
 
 class Config(_Base):

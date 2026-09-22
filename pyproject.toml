@@ -54,3 +54,7 @@ ignore = ["E501"]                                      # line length is black's 
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["integration: requires local MVTec data and trained artifacts"]
+
+[tool.setuptools.package-data]
+anomaly = ["frontend.html"]

@@ -13,6 +13,8 @@ the outlying corners of the normal distribution.
 
 from __future__ import annotations
 
+import math
+
 import torch
 from torch import Tensor
 from tqdm import tqdm
@@ -53,8 +55,12 @@ def greedy_coreset_indices(
     if not 0.0 < ratio <= 1.0:
         raise ValueError(f"ratio must be in (0, 1], got {ratio}")
 
+    if features.ndim != 2 or features.shape[0] == 0 or not torch.isfinite(features).all():
+        raise ValueError("features must be a nonempty finite matrix")
+    if projection_dim < 1:
+        raise ValueError("projection_dim must be positive")
     n_samples = features.shape[0]
-    n_select = max(1, int(round(ratio * n_samples)))
+    n_select = max(1, math.ceil(ratio * n_samples))
     if n_select >= n_samples:
         return torch.arange(n_samples)
 
@@ -70,6 +76,8 @@ def greedy_coreset_indices(
     selected[0] = start
     # min_distances[i] = distance from point i to the nearest already-selected point.
     min_distances = torch.cdist(projected, projected[start : start + 1]).squeeze(1)
+    # Identical descriptors must not make argmax choose the same row repeatedly.
+    min_distances[start] = -torch.inf
 
     iterator = range(1, n_select)
     if show_progress:
@@ -83,5 +91,6 @@ def greedy_coreset_indices(
         # the running minimum updates in O(N) instead of recomputing against all centres.
         new_distances = torch.cdist(projected, projected[nxt : nxt + 1]).squeeze(1)
         min_distances = torch.minimum(min_distances, new_distances)
+        min_distances[nxt] = -torch.inf
 
     return selected

@@ -1,7 +1,7 @@
 """Seeding and determinism controls.
 
 PatchCore has no stochastic training, but three things still draw on RNG: the coreset's
-random projection, its starting point, and DataLoader worker ordering. Seeding all of them
+random projection, reference sampling, and the calibration split. Seeding all of them
 is what lets the README claim a single command reproduces the numbers.
 """
 

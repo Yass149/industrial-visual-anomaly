@@ -34,6 +34,7 @@ class ScoreResult:
 
     scores: Tensor  # (B,) raw distances, higher is more anomalous
     maps: Tensor  # (B, crop, crop) upsampled, smoothed per-pixel distances
+    feature_summaries: Tensor | None = None  # (B, D), one observation per image for drift
 
 
 class PatchCore:
@@ -52,20 +53,24 @@ class PatchCore:
         self.feature_shape: tuple[int, int] | None = None
         self.metadata: dict[str, Any] = {}
         self._bank_knn: Tensor | None = None
+        self.reference_features: Tensor | None = None
 
     # ---------------------------------------------------------------- fitting
 
     def fit(self, loader: DataLoader, show_progress: bool = True) -> None:
         """Build the memory bank from a loader over normal images only."""
         chunks: list[Tensor] = []
+        summaries: list[Tensor] = []
+        self.feature_shape = None
         n_images = 0
         batches = tqdm(loader, desc="extracting", unit="batch") if show_progress else loader
 
         for batch in batches:
             images = batch["image"]
-            if int(batch["label"].sum()) != 0:
+            if (batch["label"] != 0).any():
                 raise RuntimeError("fit() received an anomalous image; train on normals only")
             features = self.extractor(images)
+            summaries.append(features.mean(dim=(2, 3)).cpu())
             if self.feature_shape is None:
                 self.feature_shape = (int(features.shape[2]), int(features.shape[3]))
             # Accumulate on CPU: the full bank is ~1GB before subsampling and does not need
@@ -73,6 +78,14 @@ class PatchCore:
             chunks.append(flatten_patches(features).cpu())
             n_images += images.shape[0]
 
+        if not chunks:
+            raise ValueError("cannot fit an empty loader")
+        all_summaries = torch.cat(summaries)
+        generator = torch.Generator().manual_seed(self.cfg.seed)
+        reference_indices = torch.randperm(len(all_summaries), generator=generator)
+        self.reference_features = all_summaries[
+            reference_indices[: self.cfg.monitoring.reference_sample]
+        ]
         all_patches = torch.cat(chunks)
         del chunks
 
@@ -124,6 +137,8 @@ class PatchCore:
         if self._bank_knn is None:
             b = min(self.cfg.model.n_neighbours, self.bank.shape[0])
             distance = torch.cdist(self.bank, self.bank)
+            # Float32 cdist can give a nonzero self-distance; force self to column zero.
+            distance.fill_diagonal_(-torch.inf)
             self._bank_knn = distance.topk(b, dim=1, largest=False).indices
         return self._bank_knn
 
@@ -136,6 +151,8 @@ class PatchCore:
         features = self.extractor(images)
         batch = features.shape[0]
         height, width = self.feature_shape
+        if tuple(features.shape[2:]) != (height, width):
+            raise ValueError("input patch geometry differs from the fitted memory bank")
         patches = flatten_patches(features).cpu()
 
         distances, nn_index = self._nearest_distances(patches)
@@ -161,7 +178,11 @@ class PatchCore:
             kernel = 2 * int(4.0 * sigma) + 1
             maps = gaussian_blur(maps, kernel_size=[kernel, kernel], sigma=[sigma, sigma])
 
-        return ScoreResult(scores=image_scores, maps=maps.squeeze(1))
+        return ScoreResult(
+            scores=image_scores,
+            maps=maps.squeeze(1),
+            feature_summaries=features.mean(dim=(2, 3)).cpu(),
+        )
 
     def _reweighted_image_scores(
         self, patches: Tensor, patch_distances: Tensor, nn_index: Tensor
@@ -209,7 +230,14 @@ class PatchCore:
             raise RuntimeError("nothing to save; call fit() first")
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        torch.save({"bank": self.bank, "metadata": self.metadata}, path)
+        torch.save(
+            {
+                "bank": self.bank,
+                "metadata": self.metadata,
+                "reference_features": self.reference_features,
+            },
+            path,
+        )
 
     @classmethod
     def load(cls, path: str | Path, cfg: Config, device: str = "cpu") -> PatchCore:
@@ -218,6 +246,7 @@ class PatchCore:
         model = cls(cfg, device=device)
         model.bank = payload["bank"]
         model.metadata = payload["metadata"]
+        model.reference_features = payload.get("reference_features")
         model.feature_shape = tuple(model.metadata["feature_shape"])  # type: ignore[assignment]
 
         # A bank is only meaningful for the exact feature extractor that produced it. Silently
@@ -236,7 +265,7 @@ class PatchCore:
 
     @property
     def bank_size_mb(self) -> float:
-        """Serialised size of the memory bank in megabytes."""
+        """Bank tensor size in decimal megabytes, excluding backbone, metadata and reference."""
         if self.bank is None:
             return 0.0
         return self.bank.numel() * self.bank.element_size() / 1e6
