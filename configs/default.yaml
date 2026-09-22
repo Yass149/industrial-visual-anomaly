@@ -16,7 +16,7 @@ data:
   # Mirror of the original MVTec AD release. The official site is behind a licence form
   # with no stable direct link, so the checksum below is self-generated, not vendor-published.
   url: https://huggingface.co/datasets/hdtech/mvtech_anomaly_detection/resolve/main/mvtech_anomaly_detection.zip
-  sha256: null
+  sha256: 87408b1aa72cc1c99d490315a7629fe9634ffca8524207f866bed07a7fa1d42f
   # The extracted tree is ~5GB on top of the archive; set false to reclaim the archive space
   # once extraction has succeeded, at the cost of a re-download if you ever wipe data/.
   keep_archive: true
