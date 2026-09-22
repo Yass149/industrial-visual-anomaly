@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "industrial-visual-anomaly"
+version = "0.1.0"
+description = "PatchCore anomaly detection and localisation on MVTec AD, trained on normal images only"
+requires-python = ">=3.11,<3.12"
+
+# Ranges here describe what the code is compatible with; requirements.lock holds the
+# exact versions every reported number was produced with. Install from the lock.
+dependencies = [
+    "torch>=2.2,<3",
+    "torchvision>=0.17,<1",
+    "numpy>=1.26,<3",
+    "pillow>=10.0,<12",
+    "scipy>=1.11,<2",
+    "scikit-learn>=1.4,<2",
+    "matplotlib>=3.8,<4",
+    "pyyaml>=6.0,<7",
+    "pydantic>=2.6,<3",
+    "tqdm>=4.66,<5",
+    "fastapi>=0.110,<1",
+    "uvicorn[standard]>=0.29,<1",
+    "python-multipart>=0.0.9,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0,<9",
+    "httpx>=0.27,<1",      # FastAPI TestClient transport
+    "ruff>=0.4,<1",
+    "black>=24.3,<26",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN201"]  # ANN201 enforces return types on public functions
+ignore = ["E501"]                                      # line length is black's job, not ruff's
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN201"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

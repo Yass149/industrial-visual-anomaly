@@ -1,0 +1,62 @@
+# Single source of truth for the whole pipeline. Adding a fourth MVTec category means
+# adding one string to data.categories and nothing else.
+
+seed: 42
+
+# "auto" resolves to cuda when present, otherwise cpu. Apple MPS must be requested
+# explicitly: several ops fall back to cpu silently and reductions are not bit-reproducible,
+# which would quietly undermine the reproducibility claim in the README.
+device: auto
+
+data:
+  # Absolute (or ~-prefixed) keeps the 5GB dataset off cloud-synced folders and out of the
+  # repo; a relative path here is resolved against the repo root instead.
+  root: ~/mvtec-data
+  archive_name: mvtec_anomaly_detection.zip
+  # Mirror of the original MVTec AD release. The official site is behind a licence form
+  # with no stable direct link, so the checksum below is self-generated, not vendor-published.
+  url: https://huggingface.co/datasets/hdtech/mvtech_anomaly_detection/resolve/main/mvtech_anomaly_detection.zip
+  sha256: null
+  # The extracted tree is ~5GB on top of the archive; set false to reclaim the archive space
+  # once extraction has succeeded, at the cost of a re-download if you ever wipe data/.
+  keep_archive: true
+  categories:
+    - bottle   # aligned rigid object, the easy case
+    - screw    # small and unaligned, the case embedding methods are known to struggle with
+    - carpet   # texture rather than object, proves the pipeline is not shape-specific
+
+model:
+  backbone: wide_resnet50_2
+  # Mid-level layers only: layer1 is too generic to separate defects, layer4 is too
+  # ImageNet-class-specific and its 7x7 map is too coarse to localise anything useful.
+  layers: [layer2, layer3]
+  image_size: 256
+  crop_size: 224
+  # Average-pool each patch feature over a 3x3 neighbourhood so a patch describes its local
+  # context rather than a single receptive field, as in the PatchCore paper.
+  patch_neighbourhood: 3
+  coreset_ratio: 0.01
+  # PatchCore reweights the top-1 distance by how isolated that bank neighbour is among its
+  # own k nearest neighbours, which suppresses scores driven by a single outlier bank entry.
+  n_neighbours: 9
+  gaussian_blur_sigma: 4.0
+
+eval:
+  results_dir: results
+  n_qualitative: 8
+
+threshold:
+  # cost of missing a defect, relative to the cost of a false alarm
+  cost_ratio: 10.0
+  base_rate: 0.02
+  cost_ratio_sweep: [1, 2, 5, 10, 20, 50, 100, 200]
+
+serve:
+  host: 127.0.0.1
+  port: 8000
+  category: bottle
+  artifacts_dir: artifacts
+
+monitoring:
+  drift_alpha: 0.01
+  reference_sample: 256

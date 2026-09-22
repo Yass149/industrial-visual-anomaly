@@ -1,0 +1,24 @@
+# Datasets are fetched by scripts/download_data.py, never committed (MVTec AD is ~5GB
+# and its licence forbids redistribution).
+data/
+
+# Trained memory banks and generated figures/metrics are reproducible outputs, not source.
+artifacts/
+results/
+
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+.DS_Store
+.idea/
+.vscode/
