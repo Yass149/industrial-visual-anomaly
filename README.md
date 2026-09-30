@@ -1,5 +1,7 @@
 <div align="center">
 
+  <img src="assets/readme-banner.svg" alt="Illustrated factory inspection heatmap and anomaly region" width="100%" />
+
 # Industrial visual anomaly detection
 
 Detect and localise manufacturing defects using a memory bank learned from **normal images only**.
